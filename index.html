@@ -48,7 +48,18 @@ function logout(){localStorage.removeItem('tka_t');sessionStorage.removeItem('tk
 async function login(e){e.preventDefault();
  try{const r=await fetch(API,{method:'POST',body:JSON.stringify({a:'login',u:$('#u').value.trim(),p:$('#p').value})});const j=await r.json();if(!j.ok)throw new Error(j.error);
  S.t=j.t;S.me=j.me;localStorage.tka_t=j.t;localStorage.tka_me=JSON.stringify(j.me);await load()}catch(x){$('#err').textContent=x.message}}
-const upP=d=>{if(d&&d.peserta)d.peserta.forEach(p=>{for(const k of['nama','sekolah','markaz'])p[k]=String(p[k]||'').toUpperCase();p.bio=(p.bio||[]).map(x=>String(x||'').toUpperCase())});return d};
+const pad2=x=>String(x).padStart(2,'0');
+function nDate(v){if(v==null)return'';v=String(v).trim();let m;
+ if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;
+ if(/^\d{4}-\d{2}-\d{2}T/.test(v)){const d=new Date(v);if(!isNaN(d))return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())}
+ m=v.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/);if(m)return `${m[3]}-${pad2(m[2])}-${pad2(m[1])}`;
+ return v}
+function nTime(v){if(v==null)return'';if(typeof v=='number'&&v>=0&&v<1){const t=Math.round(v*1440);return pad2(Math.floor(t/60)%24)+':'+pad2(t%60)}
+ v=String(v).trim();let m=v.match(/^(\d{1,2})[:.](\d{2})(?::\d{2})?(?:\s*[AP]M)?$/i);if(m)return pad2(m[1])+':'+m[2];
+ if(/^\d{4}-\d{2}-\d{2}T/.test(v)){const d=new Date(v);if(!isNaN(d)){const t=Math.round((d.getHours()*3600+d.getMinutes()*60+d.getSeconds())/60);return pad2(Math.floor(t/60)%24)+':'+pad2(t%60)}}
+ return v}
+const nj=j=>({...j,tanggal:nDate(j.tanggal),mulai:nTime(j.mulai),selesai:nTime(j.selesai),gel:String(j.gel??''),sesi:String(j.sesi??''),tes:String(j.tes??''),mapel:String(j.mapel??'')});
+const upP=d=>{if(d&&d.jadwal)d.jadwal=d.jadwal.map(nj);if(d&&d.peserta)d.peserta.forEach(p=>{for(const k of['nama','sekolah','markaz'])p[k]=String(p[k]||'').toUpperCase();p.bio=(p.bio||[]).map(x=>String(x||'').toUpperCase())});return d};
 async function load(){S.d=upP(await api('load'));cacheD();draw()}
 function tbl(h,r,cls='',ct=[]){const al=i=>ct.includes(i)?' class="text-center"':'';return `<div class="tw rounded-lg border border-g1 bg-white"><table class="w-full ${cls}"><tr>${h.map((x,i)=>`<th${al(i)}>${x}</th>`).join('')}</tr>${r.map(x=>`<tr>${x.map((v,i)=>`<td${al(i)}>${v}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${h.length}" class="text-center py-6">Belum ada data.</td></tr>`}</table></div>`}
 function csv(h,r,name){const t='\ufeff'+[h,...r].map(x=>x.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
@@ -146,7 +157,7 @@ function dashDraw(){const e=$('#dashBody');if(!e)return;const sel=S.f.dl,ls=labk
  <div class="grid gap-3 my-3 ${one?'lg:grid-cols-[1fr_2fr_1fr]':'2xl:grid-cols-[1fr_1.6fr_1fr]'}"><div class="order-2 ${bp}:order-none">${riCol(rs.slice(0,h))}</div><div class="order-first ${bp}:order-none min-w-0"><div class="text-center mb-3"><img src="${LOGO}" alt="Logo" class="mx-auto mb-1 rounded-md" style="width:clamp(2.5rem,4vw,4rem);height:auto"><div class="font-d font-bold text-g9 leading-tight" style="font-size:clamp(1rem,1.8vw,1.6rem)">TKA MA AL MA'TUQ TAHUN 2026</div></div><div class="text-center py-8 sm:py-12 px-3 rounded-xl bg-gradient-to-br from-g0 to-au0 border border-g1">${c?`<div class="text-lg text-g6">${esc(c.sesi)}</div><div class="tok font-bold text-g8 my-4 break-all" style="font-size:clamp(${one?'3rem,7vw,8rem':'2.5rem,4.5vw,5.5rem'})">${esc(c.token)}</div><div class="text-sm text-g6">Diperbarui ${new Date(c.updated).toLocaleTimeString('id-ID')} · ${esc(c.by)}</div>${tokBox(c,l,'text-base')}`:'<div class="text-g6 py-10 text-lg">Belum ada token</div>'}</div><div class="mt-3">${pelPanel(l)}</div></div><div class="order-3">${riCol(rs.slice(h))}</div></div><div class="grid sm:grid-cols-2 gap-4"><div><h3 class="font-bold text-g9 mb-1">Proktor</h3><ul class="text-sm">${nm(l,'Proktor')}</ul></div><div><h3 class="font-bold text-g9 mb-1">Pengawas</h3><ul class="text-sm">${nm(l,'Pengawas')}</ul></div></div>
  <h3 class="font-bold text-g9 mt-4">Daftar peserta per ruang &amp; sesi <span class="text-xs font-normal text-g6">(centang = sudah selesai, nama otomatis disembunyikan · tersimpan di perangkat ini)</span></h3>${rooms(l)}</section>`}).join('')}</div>`;
  S.sig=JSON.stringify([S.d.token,S.d.petugas,S.d.jadwal]);tkTick();const t=$('#dashT');if(t)t.textContent='Pembaruan otomatis tiap 5 detik · '+new Date().toLocaleTimeString('id-ID')}
-async function dashPoll(){try{const j=await api('dash'),sig=JSON.stringify([j.token,j.petugas,j.jadwal]);if(sig!==S.sig){S.d.token=j.token;S.d.petugas=j.petugas;S.d.jadwal=j.jadwal;dashDraw()}const t=$('#dashT');if(t)t.textContent='Pembaruan otomatis tiap 5 detik · '+new Date().toLocaleTimeString('id-ID')}catch{}}
+async function dashPoll(){try{const j=await api('dash');if(j.jadwal)j.jadwal=j.jadwal.map(nj);const sig=JSON.stringify([j.token,j.petugas,j.jadwal]);if(sig!==S.sig){S.d.token=j.token;S.d.petugas=j.petugas;S.d.jadwal=j.jadwal;dashDraw()}const t=$('#dashT');if(t)t.textContent='Pembaruan otomatis tiap 5 detik · '+new Date().toLocaleTimeString('id-ID')}catch{}}
 const JD=()=>S.d.jadwal||[];
 const jt=(j,k)=>new Date(j.tanggal+'T'+(j[k]||'00:00')+':00').getTime();
 const okJ=j=>!isNaN(jt(j,'mulai'))&&!isNaN(jt(j,'selesai'));
@@ -157,9 +168,9 @@ const mpl=(j,p)=>{const m=String(j.mapel||'').toUpperCase().replace(/\s+/g,'');r
 const mapelOf=(p,k)=>{const j=slot(p.gel,k,p['s'+k]);return j?mpl(j,p):''};
 const info=(p,k)=>{const j=slot(p.gel,k,p['s'+k]);return j?{m:mpl(j,p),w:`${dmy(j.tanggal)} ${j.mulai}–${j.selesai}`}:null};
 const sc=(p,k)=>{const i=info(p,k);return esc(p['s'+k])+(i?`<div class="text-[11px] leading-tight text-g6">${esc(i.m)}<br>${esc(i.w)}</div>`:'')};
-function ujTable(){const A=S.me.role=='admin',n=Date.now(),L=JD().filter(okJ).sort((a,b)=>jt(a,'mulai')-jt(b,'mulai'));
- const st=j=>{const s=jt(j,'mulai'),e=jt(j,'selesai');return n>=e?'<span class="text-g6">Selesai</span>':n>=s?`<span class="font-bold text-g8">Berlangsung · sisa <span class="cd cdn" data-t="${e}">${fmtD(e-n)}</span></span>`:`Mulai dalam <span class="cd cdn" data-t="${s}">${fmtD(s-n)}</span>`};
- return tbl(['Tanggal','Gel','Tes','Sesi','Mapel','Mulai','Selesai','Status',''],L.map(j=>[dmy(j.tanggal),esc(j.gel||'*'),esc(j.tes),esc(j.sesi||'*'),esc(j.mapel),esc(j.mulai),esc(j.selesai),st(j),A?`<button class="noprint text-g8 font-semibold" onclick="ujEdit('${j.id}')">edit</button> <button class="noprint text-red-700" onclick="ujDel('${j.id}')">hapus</button>`:'']),'',[0,1,2,3,5,6])}
+function ujTable(){const A=S.me.role=='admin',n=Date.now(),L=JD().filter(okJ).sort((a,b)=>jt(a,'mulai')-jt(b,'mulai')),BD=JD().filter(j=>!okJ(j));
+ const st=j=>{if(!okJ(j))return '<span class="font-bold text-red-700">Format tanggal/jam tidak terbaca — edit ulang</span>';const s=jt(j,'mulai'),e=jt(j,'selesai');return n>=e?'<span class="text-g6">Selesai</span>':n>=s?`<span class="font-bold text-g8">Berlangsung · sisa <span class="cd cdn" data-t="${e}">${fmtD(e-n)}</span></span>`:`Mulai dalam <span class="cd cdn" data-t="${s}">${fmtD(s-n)}</span>`};
+ return tbl(['Tanggal','Gel','Tes','Sesi','Mapel','Mulai','Selesai','Status',''],[...L,...BD].map(j=>[dmy(j.tanggal),esc(j.gel||'*'),esc(j.tes),esc(j.sesi||'*'),esc(j.mapel),esc(j.mulai),esc(j.selesai),st(j),A?`<button class="noprint text-g8 font-semibold" onclick="ujEdit('${j.id}')">edit</button> <button class="noprint text-red-700" onclick="ujDel('${j.id}')">hapus</button>`:'']),'',[0,1,2,3,5,6])}
 function ujSave(){const d={id:(S.ed.uj||{}).id||'',tanggal:$('#jd').value,gel:$('#jg').value.trim(),tes:$('#jk').value,sesi:$('#js').value.trim(),mapel:$('#jm').value.trim(),mulai:$('#jmu').value,selesai:$('#jse').value};if(!d.tanggal||!d.mapel||!d.mulai||!d.selesai){alert('Tanggal, mapel, jam mulai, dan jam selesai wajib diisi');return}S.ed.uj=null;act('save_jadwal',d,'Jadwal tersimpan')}
 function ujEdit(id){S.ed.uj=JD().find(x=>x.id==id);draw();scrollTo(0,0)}
 function ujDel(id){if(confirm('Hapus jadwal ini?'))act('del_jadwal',{id},'Jadwal dihapus')}
